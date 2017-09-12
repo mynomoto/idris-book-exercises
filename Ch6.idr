@@ -39,3 +39,10 @@ toFormat (c :: chars) = case toFormat chars of
 
 printf : (fmt : String) -> PrintfType (toFormat (unpack fmt))
 printf fmt = printfFmt _ ""
+
+TupleVect : Nat -> Type -> Type
+TupleVect Z ty = ()
+TupleVect (S k) ty = (ty, TupleVect k ty)
+
+test : TupleVect 4 Nat
+test = (1,2,3,4,())
