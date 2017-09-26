@@ -7,10 +7,12 @@ infixr 5 .+.
 
 data Schema = SString
             | SInt
+            | SChar
             | (.+.) Schema Schema
 
 SchemaType : Schema -> Type
 SchemaType SString = String
+SchemaType SChar = Char
 SchemaType SInt = Int
 SchemaType (x .+. y) = (SchemaType x, SchemaType y)
 
@@ -32,6 +34,7 @@ data Command : Schema -> Type where
   SetSchema : (newschema : Schema) -> Command schema
   Add: SchemaType schema -> Command schema
   Get: Integer -> Command schema
+  GetAll: Command schema
   Size: Command schema
   Quit: Command schema
 
@@ -44,15 +47,20 @@ parsePrefix SString input = getQuoted (unpack input)
                                  _ => Nothing
     getQuoted _ = Nothing
 
+parsePrefix SChar input = getChar (unpack input)
+  where
+    getChar : List Char -> Maybe (Char, String)
+    getChar (x :: ' ' :: rest) = Just(x, ltrim (pack rest))
+    getChar (x :: []) = Just(x, "")
+    getChar _ = Nothing
+
 parsePrefix SInt input = case span isDigit input of
                           ("", rest) => Nothing
                           (num, rest) => Just (cast num, ltrim rest)
 
-parsePrefix (schemal .+. schemar) input = case parsePrefix schemal input of
-                                               Nothing => Nothing
-                                               (Just (lval, input')) => case parsePrefix schemar input' of
-                                                                             Nothing => Nothing
-                                                                             (Just (rval, input'')) => Just ((lval, rval), input'')
+parsePrefix (schemal .+. schemar) input = do (lval, input') <- (parsePrefix schemal input)
+                                             (rval, input'') <- parsePrefix schemar input'
+                                             pure ((lval, rval), input'')
 
 parseBySchema : (schema : Schema) ->  String -> Maybe (SchemaType schema)
 parseBySchema schema input = case parsePrefix schema input of
@@ -65,6 +73,10 @@ parseSchema ("String" :: []) = Just SString
 parseSchema ("String" :: xs) = case parseSchema xs of
                                     Nothing => Nothing
                                     Just xs_schema => Just (SString .+. xs_schema)
+parseSchema ("Char" :: []) = Just SChar
+parseSchema ("Char" :: xs) = case parseSchema xs of
+                                    Nothing => Nothing
+                                    Just xs_schema => Just (SChar .+. xs_schema)
 parseSchema ("Int" :: []) = Just SInt
 parseSchema ("Int" :: xs) = case parseSchema xs of
                                     Nothing => Nothing
@@ -72,18 +84,17 @@ parseSchema ("Int" :: xs) = case parseSchema xs of
 parseSchema _ = Nothing
 
 parseCommand : (schema : Schema) -> (cmd : String) -> (args : String) -> Maybe (Command schema)
-parseCommand schema "add" str = case parseBySchema schema str of
-                                     Nothing => Nothing
-                                     (Just str_ok) => Just (Add str_ok)
+parseCommand schema "add" str = do str_ok <- parseBySchema schema str
+                                   Just (Add str_ok)
 -- parseCommand "search" str = Just (Search str)
+parseCommand schema "get" "" = Just GetAll
 parseCommand schema "get" val = case all isDigit (unpack val) of
                               False => Nothing
                               True => Just (Get (cast val))
 parseCommand schema "quit" "" = Just Quit
 parseCommand schema "size" "" = Just Size
-parseCommand schema "schema" str = case parseSchema (words str) of
-                                        Nothing => Nothing
-                                        Just schema_ok => Just (SetSchema schema_ok)
+parseCommand schema "schema" str = do schema_ok <- parseSchema (words str)
+                                      Just (SetSchema schema_ok)
 parseCommand _ _ _ = Nothing
 
 parse : (schema : Schema) -> (input : String) -> Maybe (Command schema)
@@ -92,6 +103,7 @@ parse schema input = case span (/= ' ') input of
 
 display : SchemaType schema -> String
 display {schema = SString} item = show item
+display {schema = SChar} item = show item
 display {schema = SInt} item = show item
 display {schema = (x .+. y)} (item1, item2) = display item1 ++ ", " ++ display item2
 
@@ -103,8 +115,8 @@ getEntry pos store = let store_items = items store in
 
 {-
 searchEntry : (query : String) -> (store : DataStore) -> Maybe (String, DataStore)
-searchEntry query store = let store_items = items store
                               filtered = foldl (\acc, item => if Strings.isInfixOf query item
+searchEntry query store = let store_items = items store
                                                                 then (length acc, item) :: acc
                                                                 else acc) [] store_items in
                               (case reverse filtered of
@@ -119,11 +131,16 @@ setSchema store schema = case size store of
                          Z => Just (MkData schema _ [])
                          (S k) => Nothing
 
+getAllEntries : (store : DataStore) -> Maybe (String, DataStore)
+getAllEntries store = let store_items = items store in
+                          Just ((unlines (toList (map display store_items))) ++ "\n", store)
+
 processInput : DataStore -> String -> Maybe (String, DataStore)
 processInput store inp = case parse (schema store) inp of
                               Nothing => Just ("Invalid command\n", store)
                               Just (Add item) => Just ("ID " ++ show (size store) ++ "\n", addToStore store item)
                               Just (Get pos) => getEntry pos store
+                              Just GetAll => getAllEntries store
                               -- Just (Search query) => searchEntry query store
                               Just Size => Just("Size " ++ show (size store) ++ "\n", store)
                               Just (SetSchema schema') => case setSchema store schema' of
