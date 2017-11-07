@@ -38,6 +38,11 @@ notLast contra LastOne = contra Refl
 notLast _ (LastCons LastOne) impossible
 notLast _ (LastCons (LastCons _)) impossible
 
+
+notIsLast : (contra1 : Last xs value -> Void) -> (contra : (xs = []) -> Void) -> Last (x :: xs) value -> Void
+notIsLast contra1 contra LastOne = contra Refl
+notIsLast contra1 contra (LastCons prf) = contra1 prf
+
 isLast : DecEq a => (xs : List a) -> (value : a) -> Dec (Last xs value)
 isLast [] value = No notInEmpty
 isLast (x :: xs) value = case decEq xs [] of
@@ -45,12 +50,5 @@ isLast (x :: xs) value = case decEq xs [] of
                                                   (Yes Refl) => Yes LastOne
                                                   (No contra) => No (notLast contra))
                               (No contra) => (case isLast xs value of
-                                                   (Yes prf) => ?isLast_1
-                                                   (No contra) => ?isLast_2)
-
-
-  
-  
-  -- case isLast xs value of
-  --                             (Yes prf) => Yes (LastCons prf)
-  --                             (No notInThere) => ?notThere_2
+                                                   (Yes prf) => Yes (LastCons prf)
+                                                   (No contra1) => No (notIsLast contra1 contra))
