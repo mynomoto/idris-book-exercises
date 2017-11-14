@@ -1,4 +1,5 @@
 import Data.Vect
+import RemoveElem
 
 -- %default total
 
@@ -36,11 +37,25 @@ readGuess = do putStr "Guess: "
 
 processGuess : (letter : Char) -> WordState (S guesses) (S letters) -> Either (WordState guesses (S letters))
                                                                               (WordState (S guesses) letters)
-processGuess letter (MkWordState word missing) = ?processGuess_rhs_1
+processGuess letter (MkWordState word missing) = case isElem letter missing of
+                                                      (Yes prf) => Right (MkWordState word (removeElem letter missing))
+                                                      (No contra) => Left (MkWordState word missing)
 
 game : WordState (S guesses) (S letters) -> IO Finished
-game x = ?game_rhs
+game {guesses} {letters} state =
+     do (_ ** Letter letter) <- readGuess
+        case processGuess letter state of
+             Left l => do putStrLn "Wrong!"
+                          case guesses of
+                               Z => pure (Lost l)
+                               (S k) => game l
+             Right r => do putStrLn "Correct!"
+                           case letters of
+                                Z => pure (Won r)
+                                (S k) => game r
 
 main : IO ()
-main = do x <- readGuess
-          pure ()
+main = do result <- game {guesses = 2} (MkWordState "Test" ['T', 'E', 'S'])
+          (case result of
+                (Lost (MkWordState word missing)) => putStrLn ("You lose. The word was " ++ word)
+                (Won (MkWordState word missing)) => putStrLn ("You win. The word was " ++ word))
