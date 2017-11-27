@@ -1,3 +1,5 @@
+import Data.List.Views
+
 %default total
 
 data SplitList : List a -> Type where
@@ -18,8 +20,15 @@ splitList input = splitListHelper input input where
   splitListHelper _ items = SplitPair [] items
 
 partial
+mergeSortPartial : Ord a => List a -> List a
+mergeSortPartial xs with (splitList xs)
+  mergeSortPartial [] | SplitNil = []
+  mergeSortPartial [x] | SplitOne = [x]
+  mergeSortPartial (lefts ++ rights) | (SplitPair lefts rights) = merge (mergeSortPartial lefts) (mergeSortPartial rights)
+
 mergeSort : Ord a => List a -> List a
-mergeSort xs with (splitList xs)
-  mergeSort [] | SplitNil = []
-  mergeSort [x] | SplitOne = [x]
-  mergeSort (lefts ++ rights) | (SplitPair lefts rights) = merge (mergeSort lefts) (mergeSort rights)
+mergeSort input with (splitRec input)
+  mergeSort [] | SplitRecNil = []
+  mergeSort [x] | SplitRecOne = [x]
+  mergeSort (lefts ++ rights) | (SplitRecPair lrec rrec) = merge (mergeSort lefts | lrec) (mergeSort rights | rrec)
+
