@@ -48,3 +48,11 @@ toBinary k with (halfRec k)
   toBinary Z | HalfRecZ = ""
   toBinary (n + n) | (HalfRecEven rec) = (toBinary n | rec) ++ "0"
   toBinary (S (n + n)) | (HalfRecOdd rec) = (toBinary n | rec) ++ "1"
+
+palindrome : Eq a => List a -> Bool
+palindrome input with (vList input)
+  palindrome [] | VNil = True
+  palindrome [x] | VOne = True
+  palindrome (x :: (xs ++ [y])) | (VCons rec) =
+    if x == y then palindrome xs | rec
+              else False
