@@ -2,6 +2,7 @@ import Data.List.Views
 import Data.Vect
 import Data.Vect.Views
 import Data.Nat.Views
+import DataStore
 %default total
 
 data TakeN : List a -> Type where
@@ -56,3 +57,13 @@ palindrome input with (vList input)
   palindrome (x :: (xs ++ [y])) | (VCons rec) =
     if x == y then palindrome xs | rec
               else False
+
+testStore : DataStore (SString .+. SInt)
+testStore = addToStore ("First", 1) $
+            addToStore ("Second", 2) $
+            empty
+
+getValues : DataStore (SString .+. val_schema) -> List (SchemaType val_schema)
+getValues input with (storeView input)
+  getValues input | Snil = []
+  getValues (addToStore (key, value) store) | (Sadd rec) = value :: getValues store | rec
